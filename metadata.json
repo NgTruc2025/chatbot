@@ -1,0 +1,7 @@
+{
+  "description": "A specialized subject support chatbot using Gemini.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "name": "App"
+}
