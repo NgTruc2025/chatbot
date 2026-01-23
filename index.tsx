@@ -21,6 +21,23 @@ const SUBJECT_LIST = [
 ];
 
 /**
+ * Suggestions for each subject
+ */
+const SUBJECT_SUGGESTIONS: Record<string, string[]> = {
+  "Toán học": ["Giải phương trình bậc 2 x² - 5x + 6 = 0", "Đạo hàm của hàm số sin(x) là gì?", "Công thức tính thể tích khối cầu?"],
+  "Vật lý": ["Định luật bảo toàn năng lượng là gì?", "Giải thích hiện tượng tán sắc ánh sáng", "Công thức tính điện trở tương đương?"],
+  "Hóa học": ["Cấu tạo nguyên tử gồm những gì?", "Cân bằng phương trình: Al + O₂ → Al₂O₃", "Đặc điểm của liên kết cộng hóa trị?"],
+  "Sinh học": ["Quá trình quang hợp diễn ra như thế nào?", "Cấu trúc của phân tử DNA?", "Sự khác biệt giữa tế bào thực vật và động vật?"],
+  "Ngữ văn": ["Phân tích giá trị nhân đạo trong Vợ nhặt", "Cách làm một bài văn nghị luận xã hội?", "Tóm tắt cốt truyện Truyện Kiều"],
+  "Lịch sử": ["Nguyên nhân dẫn đến Chiến tranh thế giới thứ nhất?", "Ý nghĩa lịch sử của Cách mạng tháng Tám?", "Chiến dịch Điện Biên Phủ diễn ra năm nào?"],
+  "Địa lý": ["Đặc điểm khí hậu nhiệt đới gió mùa?", "Tại sao có hiện tượng ngày và đêm?", "Các vùng kinh tế trọng điểm của Việt Nam?"],
+  "Tiếng Anh": ["Cách dùng thì Hiện tại hoàn thành (Present Perfect)?", "Phân biệt 'Go', 'Went', 'Gone'?", "Viết một đoạn văn giới thiệu bản thân bằng tiếng Anh"],
+  "Tin học": ["Ngôn ngữ lập trình Python là gì?", "Cách hoạt động của thuật toán tìm kiếm nhị phân?", "Cấu trúc của một mạng máy tính?"],
+  "Giáo dục công dân": ["Quyền và nghĩa vụ của công dân là gì?", "Thế nào là vi phạm pháp luật dân sự?", "Tầm quan trọng của đạo đức trong đời sống?"],
+  "Công nghệ": ["Nguyên lý làm việc của động cơ đốt trong?", "Quy trình thiết kế mạch điện gia đình?", "Cách sử dụng phần mềm AutoCAD cơ bản?"]
+};
+
+/**
  * System Instruction Template
  */
 const getSystemInstruction = (subject: string) => `
@@ -42,7 +59,7 @@ Nguyên tắc bắt buộc:
 
 Phong cách trả lời:
 - Ngắn gọn – đúng trọng tâm – sư phạm.
-- Giải thích khái niệm → Ví dụ → Ghi nhớ.
+- Sử dụng Markdown để trình bày (in đậm, danh sách, khối mã) nếu cần thiết.
 
 Bạn KHÔNG phải là trợ lý đa năng. Bạn CHỈ là trợ lý cho môn: ${subject}.
 `;
@@ -74,18 +91,20 @@ type Theme = 'light' | 'dark';
 // --- Dynamic Styles Generator ---
 
 const getThemeColors = (theme: Theme) => ({
-  background: theme === 'light' ? "#f0f2f5" : "#121212",
-  surface: theme === 'light' ? "white" : "#1e1e1e",
-  text: theme === 'light' ? "#202124" : "#e8eaed",
-  textSecondary: theme === 'light' ? "#5f6368" : "#9aa0a6",
-  border: theme === 'light' ? "#e0e0e0" : "#333",
-  borderLight: theme === 'light' ? "#eee" : "#2d2d2d",
-  inputBg: theme === 'light' ? "#fafafa" : "#2d2d2d",
-  inputBgHeader: theme === 'light' ? "#f8f9fa" : "#303134",
-  bubbleModel: theme === 'light' ? "white" : "#2d2d2d",
-  bubbleModelText: theme === 'light' ? "#202124" : "#e8eaed",
-  shadow: theme === 'light' ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.4)",
-  primary: "#1a73e8",
+  background: theme === 'light' ? "#f8f9fa" : "#0f0f0f",
+  surface: theme === 'light' ? "#ffffff" : "#1a1a1a",
+  text: theme === 'light' ? "#1a1a1b" : "#e4e6eb",
+  textSecondary: theme === 'light' ? "#65676b" : "#b0b3b8",
+  border: theme === 'light' ? "#dee2e6" : "#303030",
+  borderLight: theme === 'light' ? "#f0f2f5" : "#2a2a2a",
+  inputBg: theme === 'light' ? "#f0f2f5" : "#2d2d2d",
+  bubbleModel: theme === 'light' ? "#ffffff" : "#2d2d2d",
+  bubbleModelText: theme === 'light' ? "#1a1a1b" : "#e4e6eb",
+  shadow: theme === 'light' ? "rgba(0,0,0,0.05)" : "rgba(0,0,0,0.3)",
+  primary: "#0084ff",
+  primaryHover: "#0073e6",
+  suggestionBg: theme === 'light' ? "#e7f3ff" : "#26394a",
+  suggestionText: theme === 'light' ? "#1877f2" : "#4599ff",
 });
 
 // --- Components ---
@@ -93,23 +112,22 @@ const getThemeColors = (theme: Theme) => ({
 function LoadingIndicator({ theme }: { theme: Theme }) {
   const colors = getThemeColors(theme);
   return (
-    <div style={{ display: "flex", padding: "8px" }}>
+    <div style={{ display: "flex", padding: "12px 0", gap: "4px" }}>
       {[0, 1, 2].map((i) => (
         <div
           key={i}
           style={{
-            display: "inline-block",
-            width: "6px",
-            height: "6px",
+            width: "8px",
+            height: "8px",
             borderRadius: "50%",
-            backgroundColor: colors.textSecondary,
-            margin: "0 2px",
-            animation: `bounce 1.4s infinite ease-in-out both ${i * -0.16}s`,
+            backgroundColor: colors.primary,
+            opacity: 0.6,
+            animation: `typingPulse 1s infinite ease-in-out ${i * 0.2}s`,
           }}
         />
       ))}
       <style>
-        {`@keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }`}
+        {`@keyframes typingPulse { 0%, 100% { transform: scale(0.8); opacity: 0.4; } 50% { transform: scale(1.2); opacity: 1; } }`}
       </style>
     </div>
   );
@@ -121,18 +139,18 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme, onToggle: () => void }
     <button
       onClick={onToggle}
       style={{
-        background: "none",
+        background: colors.inputBg,
         border: "none",
         cursor: "pointer",
-        padding: "8px",
-        borderRadius: "50%",
+        padding: "10px",
+        borderRadius: "12px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         color: colors.textSecondary,
-        transition: "background 0.2s",
+        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
-      title={theme === 'light' ? "Switch to Dark Mode" : "Switch to Light Mode"}
+      title={theme === 'light' ? "Chế độ tối" : "Chế độ sáng"}
     >
       {theme === 'light' ? (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -175,6 +193,7 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
+    document.body.className = theme === 'dark' ? 'dark-theme' : '';
   }, [theme]);
 
   useEffect(() => {
@@ -197,7 +216,7 @@ function App() {
       aiClientRef.current = ai;
       
       chatRef.current = ai.chats.create({
-        model: "gemini-3-pro-preview",
+        model: "gemini-3-flash-preview",
         config: {
           systemInstruction: getSystemInstruction(subject),
           temperature: 0.5,
@@ -208,7 +227,7 @@ function App() {
       setMessages([
         {
           role: "model",
-          text: `Xin chào! Tôi là trợ lý chuyên môn cho môn **${subject}**. Bạn có thắc mắc gì về môn học này cần tôi giải đáp không?`,
+          text: `Xin chào! Tôi là trợ lý chuyên môn cho môn **${subject}**. Bạn có thắc mắc gì về môn học này cần tôi giải đáp không? Hãy chọn một gợi ý bên dưới hoặc đặt câu hỏi trực tiếp cho tôi nhé!`,
         },
       ]);
     } catch (error) {
@@ -217,10 +236,10 @@ function App() {
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || !chatRef.current || isGenerating || isRecording || isTranscribing) return;
+  const sendMessage = async (textToSend: string) => {
+    if (!textToSend.trim() || !chatRef.current || isGenerating || isRecording || isTranscribing) return;
 
-    const userMsg = inputText.trim();
+    const userMsg = textToSend.trim();
     setInputText("");
     setIsGenerating(true);
 
@@ -251,16 +270,22 @@ function App() {
           });
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending message:", error);
+      let errorMsg = "Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.";
+      if (error?.message?.includes("429")) {
+        errorMsg = "Hệ thống đang quá tải (Quota Exceeded). Vui lòng đợi một lát rồi thử lại.";
+      }
       setMessages((prev) => [
         ...prev,
-        { role: "model", text: "Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại." },
+        { role: "model", text: errorMsg },
       ]);
     } finally {
       setIsGenerating(false);
     }
   };
+
+  const handleSendMessage = () => sendMessage(inputText);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -270,10 +295,12 @@ function App() {
   };
 
   const handleReset = () => {
-    setIsSetup(false);
-    setSubject("");
-    setMessages([]);
-    chatRef.current = null;
+    if (confirm("Bạn có chắc chắn muốn thoát phiên học này và đổi môn học không?")) {
+      setIsSetup(false);
+      setSubject("");
+      setMessages([]);
+      chatRef.current = null;
+    }
   };
 
   const handleMicClick = () => {
@@ -292,7 +319,7 @@ function App() {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      alert("Không thể truy cập microphone.");
+      alert("Không thể truy cập microphone. Vui lòng kiểm tra quyền truy cập.");
     }
   };
 
@@ -339,15 +366,14 @@ function App() {
     }
   };
 
-  // Common Styles Wrapper
   const containerStyle: React.CSSProperties = {
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     backgroundColor: colors.background,
     height: "100vh",
     display: "flex",
     flexDirection: "column",
     color: colors.text,
-    transition: "background-color 0.3s, color 0.3s",
+    transition: "background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
   };
 
   if (!isSetup) {
@@ -356,70 +382,84 @@ function App() {
         <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </div>
-        <div style={{ display: 'flex', flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flex: 1, justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
           <div style={{
-            padding: "2.5rem 2rem",
+            padding: "3rem 2.5rem",
             backgroundColor: colors.surface,
-            borderRadius: "16px",
-            boxShadow: `0 10px 25px ${colors.shadow}`,
-            maxWidth: "420px",
-            width: "90%",
+            borderRadius: "24px",
+            boxShadow: `0 20px 50px ${colors.shadow}`,
+            maxWidth: "450px",
+            width: "100%",
             textAlign: "center",
-            transition: "background-color 0.3s",
+            transition: "all 0.3s ease",
           }}>
-            <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🎓</div>
-            <h1 style={{ marginBottom: "1.5rem", color: colors.primary, fontSize: "1.75rem", fontWeight: "700" }}>Trợ lý Học tập AI</h1>
-            <p style={{ marginBottom: '2rem', color: colors.textSecondary, lineHeight: '1.6' }}>
-              Chào mừng bạn! Vui lòng chọn môn học cần hỗ trợ chuyên môn để bắt đầu.
+            <div style={{ 
+              width: '100px', height: '100px', 
+              backgroundColor: colors.inputBg, 
+              borderRadius: '50%', margin: '0 auto 1.5rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '3.5rem'
+            }}>🎓</div>
+            <h1 style={{ marginBottom: "0.5rem", color: colors.text, fontSize: "2rem", fontWeight: "800" }}>Trợ lý Học tập</h1>
+            <p style={{ marginBottom: '2.5rem', color: colors.textSecondary, lineHeight: '1.6', fontSize: '0.95rem' }}>
+              Chọn môn học để bắt đầu hành trình chinh phục kiến thức cùng trí tuệ nhân tạo.
             </p>
             
-            <select
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                borderRadius: "10px",
-                border: `2px solid ${colors.border}`,
-                marginBottom: "1.5rem",
-                fontSize: "1rem",
-                backgroundColor: colors.inputBg,
-                color: colors.text,
-                cursor: "pointer",
-                outline: "none",
-                appearance: "none",
-                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22${encodeURIComponent(colors.textSecondary)}%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 12px center",
-                backgroundSize: "18px",
-              }}
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              autoFocus
-            >
-              <option value="" disabled>-- Chọn môn học --</option>
-              {SUBJECT_LIST.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <div style={{ position: 'relative', textAlign: 'left' }}>
+              <label style={{ 
+                display: 'block', marginBottom: '0.6rem', fontSize: '0.85rem', 
+                fontWeight: '600', color: colors.textSecondary, marginLeft: '4px' 
+              }}>Lĩnh vực học tập</label>
+              <select
+                style={{
+                  width: "100%",
+                  padding: "16px 20px",
+                  borderRadius: "16px",
+                  border: `2px solid ${colors.border}`,
+                  marginBottom: "2rem",
+                  fontSize: "1.05rem",
+                  backgroundColor: colors.inputBg,
+                  color: colors.text,
+                  cursor: "pointer",
+                  outline: "none",
+                  appearance: "none",
+                  backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22${encodeURIComponent(colors.textSecondary)}%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 20px center",
+                  backgroundSize: "20px",
+                  transition: "border-color 0.2s",
+                }}
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                autoFocus
+              >
+                <option value="" disabled>-- Chọn một môn học --</option>
+                {SUBJECT_LIST.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
 
             <button 
               style={{
                 width: "100%",
-                padding: "14px",
+                padding: "16px",
                 backgroundColor: colors.primary,
                 color: "white",
                 border: "none",
-                borderRadius: "10px",
-                fontSize: "1rem",
+                borderRadius: "16px",
+                fontSize: "1.1rem",
                 cursor: subject ? "pointer" : "not-allowed",
-                fontWeight: "600",
-                opacity: subject ? 1 : 0.5,
-                boxShadow: subject ? `0 4px 6px ${colors.primary}33` : "none",
-                transition: "all 0.2s",
+                fontWeight: "700",
+                opacity: subject ? 1 : 0.6,
+                transform: subject ? 'translateY(0)' : 'translateY(0)',
+                boxShadow: subject ? `0 8px 15px ${colors.primary}44` : "none",
+                transition: "all 0.3s cubic-bezier(0.2, 0, 0, 1)",
               }} 
               onClick={handleStart}
               disabled={!subject}
             >
-              Bắt đầu học ngay
+              Bắt đầu ngay
             </button>
           </div>
         </div>
@@ -430,42 +470,50 @@ function App() {
   return (
     <div style={containerStyle}>
       <style>{`
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.4); }
-          70% { box-shadow: 0 0 0 12px rgba(217, 48, 37, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0); }
-        }
+        @keyframes messageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(217, 48, 37, 0); } 100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0); } }
+        .message-item { animation: messageIn 0.3s ease-out forwards; }
+        .suggestion-pill:hover { filter: brightness(0.95); transform: translateY(-1px); }
+        .suggestion-pill:active { transform: translateY(0); }
       `}</style>
       
+      {/* Header */}
       <div style={{
-        padding: "1rem 1.5rem",
+        padding: "1rem 2rem",
         backgroundColor: colors.surface,
-        borderBottom: `1px solid ${colors.borderLight}`,
+        borderBottom: `1px solid ${colors.border}`,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        boxShadow: `0 2px 4px ${colors.shadow}`,
-        zIndex: 10,
-        transition: "background-color 0.3s, border-color 0.3s",
+        boxShadow: `0 4px 12px ${colors.shadow}`,
+        zIndex: 100,
+        transition: "all 0.3s",
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '1.75rem' }}>📚</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ 
+            width: '44px', height: '44px', 
+            borderRadius: '12px', 
+            backgroundColor: colors.primary + '11',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1.5rem'
+          }}>📚</div>
           <div>
-            <div style={{ fontSize: "1.2rem", fontWeight: "700", color: colors.primary }}>{subject}</div>
-            <div style={{ fontSize: '0.8rem', color: colors.textSecondary, fontWeight: '500' }}>AI Support Specialist</div>
+            <div style={{ fontSize: "1.25rem", fontWeight: "800", color: colors.primary, letterSpacing: '-0.02em' }}>{subject}</div>
+            <div style={{ fontSize: '0.75rem', color: colors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Chuyên gia Giáo dục</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <div style={{ width: '1px', height: '24px', backgroundColor: colors.border, margin: '0 4px' }} />
           <button style={{
-            background: colors.inputBgHeader,
-            border: `1px solid ${colors.border}`,
-            padding: "8px 16px",
-            borderRadius: "8px",
+            background: 'transparent',
+            border: `1.5px solid ${colors.border}`,
+            padding: "10px 18px",
+            borderRadius: "12px",
             cursor: "pointer",
             fontSize: "0.85rem",
             color: colors.textSecondary,
-            fontWeight: "500",
+            fontWeight: "700",
             transition: "all 0.2s",
           }} onClick={handleReset}>
             Đổi môn học
@@ -473,102 +521,167 @@ function App() {
         </div>
       </div>
 
+      {/* Chat Area */}
       <div style={{
         flex: 1,
         overflowY: "auto",
-        padding: "1.5rem",
+        padding: "2rem",
         display: "flex",
         flexDirection: "column",
-        gap: "1.2rem",
+        gap: "1.5rem",
       }}>
         {messages.map((msg, idx) => (
-          <div key={idx} style={{
-            maxWidth: "85%",
-            padding: "12px 18px",
-            borderRadius: "18px",
-            lineHeight: "1.6",
+          <div key={idx} className="message-item" style={{
+            maxWidth: "80%",
+            padding: "14px 20px",
+            borderRadius: "20px",
+            lineHeight: "1.7",
             alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
             backgroundColor: msg.role === "user" ? colors.primary : colors.bubbleModel,
-            color: msg.role === "user" ? "white" : colors.bubbleModelText,
-            borderTopRightRadius: msg.role === "user" ? "4px" : "18px",
-            borderTopLeftRadius: msg.role === "model" ? "4px" : "18px",
-            boxShadow: msg.role === "model" ? `0 2px 5px ${colors.shadow}` : "none",
+            color: msg.role === "user" ? "#fff" : colors.bubbleModelText,
+            borderBottomRightRadius: msg.role === "user" ? "4px" : "20px",
+            borderBottomLeftRadius: msg.role === "model" ? "4px" : "20px",
+            boxShadow: `0 4px 15px ${colors.shadow}`,
             whiteSpace: "pre-wrap",
-            fontSize: "0.95rem",
-            transition: "background-color 0.3s",
+            fontSize: "1rem",
+            transition: "all 0.3s",
+            border: msg.role === "model" ? `1px solid ${colors.border}` : "none",
           }}>
             {msg.text || (msg.role === "model" && isGenerating && idx === messages.length - 1 ? <LoadingIndicator theme={theme} /> : "")}
           </div>
         ))}
+
+        {/* Suggested Questions Section */}
+        {messages.length === 1 && !isGenerating && (
+          <div style={{
+            marginTop: '1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.8rem',
+            alignItems: 'flex-start',
+            animation: 'messageIn 0.5s ease-out 0.2s both'
+          }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginLeft: '4px' }}>💡 Gợi ý cho bạn:</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {SUBJECT_SUGGESTIONS[subject]?.map((suggestion, i) => (
+                <button
+                  key={i}
+                  className="suggestion-pill"
+                  onClick={() => sendMessage(suggestion)}
+                  style={{
+                    backgroundColor: colors.suggestionBg,
+                    color: colors.suggestionText,
+                    border: 'none',
+                    padding: '10px 18px',
+                    borderRadius: '14px',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'left',
+                    maxWidth: '100%'
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Input Area */}
       <div style={{
-        padding: "1rem 1.5rem",
+        padding: "1.5rem 2rem",
         backgroundColor: colors.surface,
-        borderTop: `1px solid ${colors.borderLight}`,
-        display: "flex",
-        gap: "0.75rem",
-        alignItems: "flex-end",
-        transition: "background-color 0.3s",
+        borderTop: `1px solid ${colors.border}`,
+        transition: "all 0.3s",
+        boxShadow: `0 -10px 30px ${colors.shadow}`,
       }}>
-        <button
-          style={{
-            width: "48px", height: "48px", borderRadius: "50%",
-            backgroundColor: isRecording ? "#fce8e6" : colors.inputBgHeader,
-            color: isRecording ? "#d93025" : colors.textSecondary,
-            border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0,
-            animation: isRecording ? "pulse 1.5s infinite" : "none",
-            transition: "all 0.2s",
-          }}
-          onClick={handleMicClick}
-          disabled={isGenerating || isTranscribing}
-          title="Nhập bằng giọng nói"
-        >
-           {isTranscribing ? <LoadingIndicator theme={theme} /> : (
-             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-               <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-               <line x1="12" y1="19" x2="12" y2="23"></line>
-               <line x1="8" y1="23" x2="16" y2="23"></line>
-             </svg>
-           )}
-        </button>
+        <div style={{
+          maxWidth: '900px',
+          margin: '0 auto',
+          display: "flex",
+          gap: "1rem",
+          alignItems: "flex-end",
+          backgroundColor: colors.inputBg,
+          padding: '8px 12px',
+          borderRadius: '24px',
+          border: `2px solid ${isGenerating ? 'transparent' : colors.border}`,
+          transition: 'border-color 0.2s',
+        }}>
+          <button
+            style={{
+              width: "44px", height: "44px", borderRadius: "50%",
+              backgroundColor: isRecording ? "#fce8e6" : "transparent",
+              color: isRecording ? "#d93025" : colors.textSecondary,
+              border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0,
+              animation: isRecording ? "pulse 1.5s infinite" : "none",
+              transition: "all 0.2s",
+            }}
+            onClick={handleMicClick}
+            disabled={isGenerating || isTranscribing}
+            title="Ghi âm câu hỏi"
+          >
+             {isTranscribing ? <LoadingIndicator theme={theme} /> : (
+               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                 <line x1="12" y1="19" x2="12" y2="23"></line>
+                 <line x1="8" y1="23" x2="16" y2="23"></line>
+               </svg>
+             )}
+          </button>
 
-        <textarea
-          style={{
-            flex: 1, padding: "12px 18px", borderRadius: "26px", border: `1px solid ${colors.border}`,
-            fontSize: "1rem", outline: "none", resize: "none", height: "24px", minHeight: "24px", maxHeight: "150px",
-            fontFamily: "inherit", overflowY: "auto", backgroundColor: colors.inputBg, color: colors.text,
-            transition: "background-color 0.3s, border-color 0.3s, color 0.3s",
-          }}
-          placeholder={isRecording ? "Đang lắng nghe..." : (isTranscribing ? "Đang xử lý giọng nói..." : "Hỏi trợ lý môn học...")}
-          value={inputText}
-          onChange={handleInputResize}
-          onKeyDown={handleKeyDown}
-          disabled={isGenerating || isRecording || isTranscribing}
-          rows={1}
-        />
-        
-        <button 
-          style={{
-            width: "48px", height: "48px", borderRadius: "50%",
-            backgroundColor: colors.primary, color: "white",
-            border: "none", display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: inputText.trim() && !isGenerating ? "pointer" : "default",
-            opacity: inputText.trim() && !isGenerating && !isRecording && !isTranscribing ? 1 : 0.4,
-            transform: inputText.trim() && !isGenerating ? 'scale(1)' : 'scale(0.95)',
-            boxShadow: `0 2px 4px ${colors.primary}4d`,
-            transition: "all 0.2s",
-          }} 
-          onClick={handleSendMessage}
-          disabled={!inputText.trim() || isGenerating || isRecording || isTranscribing}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </button>
+          <textarea
+            style={{
+              flex: 1, 
+              padding: "10px 8px", 
+              borderRadius: "0", 
+              border: `none`,
+              fontSize: "1rem", 
+              outline: "none", 
+              resize: "none", 
+              height: "24px", 
+              minHeight: "24px", 
+              maxHeight: "150px",
+              fontFamily: "inherit", 
+              backgroundColor: "transparent", 
+              color: colors.text,
+              lineHeight: '1.5'
+            }}
+            placeholder={isRecording ? "Đang lắng nghe..." : (isTranscribing ? "Đang chép lời..." : "Đặt câu hỏi chuyên môn cho tôi...")}
+            value={inputText}
+            onChange={handleInputResize}
+            onKeyDown={handleKeyDown}
+            disabled={isGenerating || isRecording || isTranscribing}
+            rows={1}
+          />
+          
+          <button 
+            style={{
+              width: "44px", height: "44px", borderRadius: "18px",
+              backgroundColor: colors.primary, color: "white",
+              border: "none", display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: inputText.trim() && !isGenerating ? "pointer" : "default",
+              opacity: inputText.trim() && !isGenerating && !isRecording && !isTranscribing ? 1 : 0.4,
+              boxShadow: inputText.trim() && !isGenerating ? `0 4px 12px ${colors.primary}66` : "none",
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+              transform: inputText.trim() && !isGenerating ? 'scale(1)' : 'scale(0.9)',
+            }} 
+            onClick={handleSendMessage}
+            disabled={!inputText.trim() || isGenerating || isRecording || isTranscribing}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '0.7rem', color: colors.textSecondary, fontWeight: '500' }}>
+          AI có thể mắc sai sót. Hãy kiểm tra các thông tin quan trọng.
+        </div>
       </div>
     </div>
   );
