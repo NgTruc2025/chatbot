@@ -176,6 +176,7 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme, onToggle: () => void }
 function App() {
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('custom_api_key') || "");
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('custom_api_key') && !process.env.API_KEY);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [isSetup, setIsSetup] = useState(false);
@@ -379,11 +380,83 @@ function App() {
     setApiKey(key);
     localStorage.setItem('custom_api_key', key);
     setIsSettingsOpen(false);
+    setShowWelcome(false);
     // Re-initialize AI client if needed
     if (aiClientRef.current) {
       aiClientRef.current = new GoogleGenAI({ apiKey: key || process.env.API_KEY || "" });
     }
   };
+
+  const WelcomeScreen = () => (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 2000, padding: '1rem'
+    }}>
+      <div style={{
+        backgroundColor: colors.surface, padding: '3rem 2rem', borderRadius: '32px',
+        width: '100%', maxWidth: '500px', boxShadow: `0 30px 60px ${colors.shadow}`,
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>👋</div>
+        <h1 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '1rem' }}>Chào mừng bạn!</h1>
+        <p style={{ color: colors.textSecondary, lineHeight: '1.6', marginBottom: '2rem' }}>
+          Để bắt đầu sử dụng Trợ lý Học tập AI, bạn cần cấu hình Gemini API Key. 
+          Đây là dịch vụ hoàn toàn miễn phí từ Google.
+        </p>
+        
+        <div style={{ 
+          textAlign: 'left', backgroundColor: colors.inputBg, padding: '1.5rem', 
+          borderRadius: '20px', marginBottom: '2rem', border: `1px solid ${colors.border}` 
+        }}>
+          <h3 style={{ marginTop: 0, fontSize: '1rem', marginBottom: '1rem' }}>Hướng dẫn lấy API Key:</h3>
+          <ol style={{ paddingLeft: '1.2rem', fontSize: '0.9rem', color: colors.text, lineHeight: '1.8' }}>
+            <li>Truy cập <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: colors.primary, fontWeight: '700', textDecoration: 'none' }}>Google AI Studio</a>.</li>
+            <li>Nhấn nút <b>"Create API key"</b>.</li>
+            <li>Sao chép mã (chuỗi ký tự dài) và dán vào ô bên dưới.</li>
+          </ol>
+        </div>
+
+        <input 
+          type="password"
+          placeholder="Dán API Key của bạn tại đây..."
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          style={{
+            width: '100%', padding: '16px 20px', borderRadius: '16px',
+            border: `2px solid ${colors.border}`, backgroundColor: colors.inputBg,
+            color: colors.text, marginBottom: '1.5rem', outline: 'none', fontSize: '1rem'
+          }}
+        />
+
+        <button 
+          onClick={() => saveApiKey(apiKey)}
+          disabled={!apiKey.trim()}
+          style={{
+            width: '100%', padding: '16px', borderRadius: '16px', border: 'none',
+            backgroundColor: colors.primary, color: 'white', cursor: apiKey.trim() ? 'pointer' : 'not-allowed', 
+            fontWeight: '700', fontSize: '1.1rem', opacity: apiKey.trim() ? 1 : 0.6,
+            boxShadow: apiKey.trim() ? `0 10px 20px ${colors.primary}44` : 'none',
+            transition: 'all 0.3s'
+          }}
+        >
+          Bắt đầu sử dụng
+        </button>
+        
+        {process.env.API_KEY && (
+          <button 
+            onClick={() => setShowWelcome(false)}
+            style={{
+              marginTop: '1rem', background: 'none', border: 'none', color: colors.textSecondary,
+              cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'underline'
+            }}
+          >
+            Sử dụng Key hệ thống (nếu có)
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   const SettingsModal = () => (
     <div style={{
@@ -443,6 +516,7 @@ function App() {
   if (!isSetup) {
     return (
       <div style={containerStyle}>
+        {showWelcome && <WelcomeScreen />}
         {isSettingsOpen && <SettingsModal />}
         <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', gap: '12px' }}>
           <button
