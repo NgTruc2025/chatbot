@@ -175,6 +175,8 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme, onToggle: () => void }
 
 function App() {
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'light');
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('custom_api_key') || "");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [isSetup, setIsSetup] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -212,7 +214,13 @@ function App() {
     if (!subject.trim()) return;
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      const effectiveKey = apiKey || process.env.API_KEY || "";
+      if (!effectiveKey) {
+        alert("Vui lòng cấu hình API Key trong phần cài đặt trước khi bắt đầu.");
+        setIsSettingsOpen(true);
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey: effectiveKey });
       aiClientRef.current = ai;
       
       chatRef.current = ai.chats.create({
@@ -337,7 +345,8 @@ function App() {
     try {
       const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
       const base64Audio = await blobToBase64(audioBlob);
-      const ai = aiClientRef.current || new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      const effectiveKey = apiKey || process.env.API_KEY || "";
+      const ai = aiClientRef.current || new GoogleGenAI({ apiKey: effectiveKey });
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-native-audio-preview-12-2025",
         contents: {
@@ -366,6 +375,61 @@ function App() {
     }
   };
 
+  const saveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem('custom_api_key', key);
+    setIsSettingsOpen(false);
+    // Re-initialize AI client if needed
+    if (aiClientRef.current) {
+      aiClientRef.current = new GoogleGenAI({ apiKey: key || process.env.API_KEY || "" });
+    }
+  };
+
+  const SettingsModal = () => (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, backdropFilter: 'blur(4px)'
+    }}>
+      <div style={{
+        backgroundColor: colors.surface, padding: '2rem', borderRadius: '24px',
+        width: '90%', maxWidth: '400px', boxShadow: `0 20px 40px ${colors.shadow}`
+      }}>
+        <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem' }}>Cấu hình API Key</h2>
+        <p style={{ color: colors.textSecondary, fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+          Nhập Gemini API Key của bạn để sử dụng ứng dụng. Key sẽ được lưu an toàn trong trình duyệt của bạn.
+        </p>
+        <input 
+          type="password"
+          placeholder="Nhập API Key tại đây..."
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          style={{
+            width: '100%', padding: '12px 16px', borderRadius: '12px',
+            border: `2px solid ${colors.border}`, backgroundColor: colors.inputBg,
+            color: colors.text, marginBottom: '1.5rem', outline: 'none'
+          }}
+        />
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button 
+            onClick={() => setIsSettingsOpen(false)}
+            style={{
+              flex: 1, padding: '12px', borderRadius: '12px', border: `1px solid ${colors.border}`,
+              backgroundColor: 'transparent', color: colors.text, cursor: 'pointer', fontWeight: '600'
+            }}
+          >Hủy</button>
+          <button 
+            onClick={() => saveApiKey(apiKey)}
+            style={{
+              flex: 1, padding: '12px', borderRadius: '12px', border: 'none',
+              backgroundColor: colors.primary, color: 'white', cursor: 'pointer', fontWeight: '600'
+            }}
+          >Lưu Key</button>
+        </div>
+      </div>
+    </div>
+  );
+
   const containerStyle: React.CSSProperties = {
     fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     backgroundColor: colors.background,
@@ -379,7 +443,22 @@ function App() {
   if (!isSetup) {
     return (
       <div style={containerStyle}>
-        <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}>
+        {isSettingsOpen && <SettingsModal />}
+        <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', gap: '12px' }}>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            style={{
+              background: colors.inputBg, border: "none", cursor: "pointer",
+              padding: "10px", borderRadius: "12px", display: "flex",
+              alignItems: "center", justifyContent: "center", color: colors.textSecondary,
+            }}
+            title="Cấu hình API Key"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </div>
         <div style={{ display: 'flex', flex: 1, justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
@@ -469,6 +548,7 @@ function App() {
 
   return (
     <div style={containerStyle}>
+      {isSettingsOpen && <SettingsModal />}
       <style>{`
         @keyframes messageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(217, 48, 37, 0); } 100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0); } }
@@ -503,6 +583,20 @@ function App() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            style={{
+              background: colors.inputBg, border: "none", cursor: "pointer",
+              padding: "10px", borderRadius: "12px", display: "flex",
+              alignItems: "center", justifyContent: "center", color: colors.textSecondary,
+            }}
+            title="Cấu hình API Key"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <div style={{ width: '1px', height: '24px', backgroundColor: colors.border, margin: '0 4px' }} />
           <button style={{
