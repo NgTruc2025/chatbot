@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Chat } from "@google/genai";
+import "./index.css";
 
 /**
  * List of standard subjects for the dropdown
@@ -178,6 +179,10 @@ function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('custom_api_key') || "");
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('custom_api_key') && !process.env.API_KEY);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<Record<string, string[]>>(() => {
+    const saved = localStorage.getItem('subject_suggestions');
+    return saved ? JSON.parse(saved) : SUBJECT_SUGGESTIONS;
+  });
   const [subject, setSubject] = useState("");
   const [isSetup, setIsSetup] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -215,7 +220,7 @@ function App() {
     if (!subject.trim()) return;
 
     try {
-      const effectiveKey = apiKey || process.env.API_KEY || "";
+      const effectiveKey = (apiKey || process.env.API_KEY || "").trim();
       if (!effectiveKey) {
         alert("Vui lòng cấu hình API Key trong phần cài đặt trước khi bắt đầu.");
         setIsSettingsOpen(true);
@@ -346,7 +351,7 @@ function App() {
     try {
       const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
       const base64Audio = await blobToBase64(audioBlob);
-      const effectiveKey = apiKey || process.env.API_KEY || "";
+      const effectiveKey = (apiKey || process.env.API_KEY || "").trim();
       const ai = aiClientRef.current || new GoogleGenAI({ apiKey: effectiveKey });
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-native-audio-preview-12-2025",
@@ -377,14 +382,20 @@ function App() {
   };
 
   const saveApiKey = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem('custom_api_key', key);
+    const trimmedKey = key.trim();
+    setApiKey(trimmedKey);
+    localStorage.setItem('custom_api_key', trimmedKey);
     setIsSettingsOpen(false);
     setShowWelcome(false);
     // Re-initialize AI client if needed
     if (aiClientRef.current) {
-      aiClientRef.current = new GoogleGenAI({ apiKey: key || process.env.API_KEY || "" });
+      aiClientRef.current = new GoogleGenAI({ apiKey: trimmedKey || process.env.API_KEY || "" });
     }
+  };
+
+  const saveSuggestions = (newSuggestions: Record<string, string[]>) => {
+    setSuggestions(newSuggestions);
+    localStorage.setItem('subject_suggestions', JSON.stringify(newSuggestions));
   };
 
   const WelcomeScreen = () => (
@@ -458,50 +469,207 @@ function App() {
     </div>
   );
 
-  const SettingsModal = () => (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000, backdropFilter: 'blur(4px)'
-    }}>
+  const SettingsModal = () => {
+    const [activeTab, setActiveTab] = useState<'api' | 'suggestions'>('api');
+    const [selectedSubject, setSelectedSubject] = useState(subject || SUBJECT_LIST[0]);
+    const [newSuggestion, setNewSuggestion] = useState("");
+    const [editingIdx, setEditingIdx] = useState<number | null>(null);
+    const [editingText, setEditingText] = useState("");
+
+    const currentSuggestions = suggestions[selectedSubject] || [];
+
+    const handleAddSuggestion = () => {
+      if (!newSuggestion.trim()) return;
+      const updated = {
+        ...suggestions,
+        [selectedSubject]: [...currentSuggestions, newSuggestion.trim()]
+      };
+      saveSuggestions(updated);
+      setNewSuggestion("");
+    };
+
+    const handleDeleteSuggestion = (idx: number) => {
+      const updatedList = currentSuggestions.filter((_, i) => i !== idx);
+      const updated = {
+        ...suggestions,
+        [selectedSubject]: updatedList
+      };
+      saveSuggestions(updated);
+    };
+
+    const handleStartEdit = (idx: number, text: string) => {
+      setEditingIdx(idx);
+      setEditingText(text);
+    };
+
+    const handleSaveEdit = (idx: number) => {
+      if (!editingText.trim()) return;
+      const updatedList = [...currentSuggestions];
+      updatedList[idx] = editingText.trim();
+      const updated = {
+        ...suggestions,
+        [selectedSubject]: updatedList
+      };
+      saveSuggestions(updated);
+      setEditingIdx(null);
+    };
+
+    return (
       <div style={{
-        backgroundColor: colors.surface, padding: '2rem', borderRadius: '24px',
-        width: '90%', maxWidth: '400px', boxShadow: `0 20px 40px ${colors.shadow}`
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 3000, backdropFilter: 'blur(8px)', padding: '1rem'
       }}>
-        <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem' }}>Cấu hình API Key</h2>
-        <p style={{ color: colors.textSecondary, fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-          Nhập Gemini API Key của bạn để sử dụng ứng dụng. Key sẽ được lưu an toàn trong trình duyệt của bạn.
-        </p>
-        <input 
-          type="password"
-          placeholder="Nhập API Key tại đây..."
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          style={{
-            width: '100%', padding: '12px 16px', borderRadius: '12px',
-            border: `2px solid ${colors.border}`, backgroundColor: colors.inputBg,
-            color: colors.text, marginBottom: '1.5rem', outline: 'none'
-          }}
-        />
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button 
-            onClick={() => setIsSettingsOpen(false)}
-            style={{
-              flex: 1, padding: '12px', borderRadius: '12px', border: `1px solid ${colors.border}`,
-              backgroundColor: 'transparent', color: colors.text, cursor: 'pointer', fontWeight: '600'
-            }}
-          >Hủy</button>
-          <button 
-            onClick={() => saveApiKey(apiKey)}
-            style={{
-              flex: 1, padding: '12px', borderRadius: '12px', border: 'none',
-              backgroundColor: colors.primary, color: 'white', cursor: 'pointer', fontWeight: '600'
-            }}
-          >Lưu Key</button>
+        <div style={{
+          backgroundColor: colors.surface, borderRadius: '28px',
+          width: '100%', maxWidth: '500px', maxHeight: '90vh', overflow: 'hidden',
+          boxShadow: `0 25px 50px ${colors.shadow}`, display: 'flex', flexDirection: 'column'
+        }}>
+          {/* Tabs */}
+          <div style={{ display: 'flex', borderBottom: `1px solid ${colors.border}` }}>
+            <button 
+              onClick={() => setActiveTab('api')}
+              style={{
+                flex: 1, padding: '1.2rem', border: 'none', background: 'none',
+                color: activeTab === 'api' ? colors.primary : colors.textSecondary,
+                fontWeight: '700', cursor: 'pointer', borderBottom: activeTab === 'api' ? `3px solid ${colors.primary}` : 'none'
+              }}
+            >API Key</button>
+            <button 
+              onClick={() => setActiveTab('suggestions')}
+              style={{
+                flex: 1, padding: '1.2rem', border: 'none', background: 'none',
+                color: activeTab === 'suggestions' ? colors.primary : colors.textSecondary,
+                fontWeight: '700', cursor: 'pointer', borderBottom: activeTab === 'suggestions' ? `3px solid ${colors.primary}` : 'none'
+              }}
+            >Gợi ý câu hỏi</button>
+          </div>
+
+          <div style={{ padding: '2rem', overflowY: 'auto', flex: 1 }}>
+            {activeTab === 'api' ? (
+              <>
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem' }}>Cấu hình API Key</h2>
+                <p style={{ color: colors.textSecondary, fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                  Nhập Gemini API Key của bạn để sử dụng ứng dụng. Key sẽ được lưu an toàn trong trình duyệt của bạn.
+                </p>
+                <input 
+                  type="password"
+                  placeholder="Nhập API Key tại đây..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  style={{
+                    width: '100%', padding: '14px 18px', borderRadius: '14px',
+                    border: `2px solid ${colors.border}`, backgroundColor: colors.inputBg,
+                    color: colors.text, marginBottom: '1.5rem', outline: 'none'
+                  }}
+                />
+                <button 
+                  onClick={() => saveApiKey(apiKey)}
+                  style={{
+                    width: '100%', padding: '14px', borderRadius: '14px', border: 'none',
+                    backgroundColor: colors.primary, color: 'white', cursor: 'pointer', fontWeight: '700'
+                  }}
+                >Lưu API Key</button>
+              </>
+            ) : (
+              <>
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem' }}>Quản lý câu hỏi gợi ý</h2>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600', color: colors.textSecondary }}>Chọn môn học:</label>
+                  <select 
+                    value={selectedSubject}
+                    onChange={(e) => setSelectedSubject(e.target.value)}
+                    style={{
+                      width: '100%', padding: '12px', borderRadius: '12px',
+                      border: `2px solid ${colors.border}`, backgroundColor: colors.inputBg,
+                      color: colors.text, outline: 'none', cursor: 'pointer'
+                    }}
+                  >
+                    {SUBJECT_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600', color: colors.textSecondary }}>Thêm gợi ý mới:</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="text"
+                      placeholder="Nhập câu hỏi gợi ý..."
+                      value={newSuggestion}
+                      onChange={(e) => setNewSuggestion(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddSuggestion()}
+                      style={{
+                        flex: 1, padding: '12px', borderRadius: '12px',
+                        border: `2px solid ${colors.border}`, backgroundColor: colors.inputBg,
+                        color: colors.text, outline: 'none'
+                      }}
+                    />
+                    <button 
+                      onClick={handleAddSuggestion}
+                      style={{
+                        padding: '0 16px', borderRadius: '12px', border: 'none',
+                        backgroundColor: colors.primary, color: 'white', cursor: 'pointer', fontWeight: '700'
+                      }}
+                    >+</button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {currentSuggestions.map((s, i) => (
+                    <div key={i} style={{
+                      padding: '12px', borderRadius: '12px', backgroundColor: colors.inputBg,
+                      border: `1px solid ${colors.border}`, display: 'flex', gap: '10px', alignItems: 'center'
+                    }}>
+                      {editingIdx === i ? (
+                        <input 
+                          autoFocus
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          onBlur={() => handleSaveEdit(i)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(i)}
+                          style={{ flex: 1, background: 'none', border: 'none', color: colors.text, outline: 'none' }}
+                        />
+                      ) : (
+                        <span style={{ flex: 1, fontSize: '0.9rem' }}>{s}</span>
+                      )}
+                      
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button 
+                          onClick={() => editingIdx === i ? handleSaveEdit(i) : handleStartEdit(i, s)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.primary, padding: '4px' }}
+                        >
+                          {editingIdx === i ? "✅" : "✏️"}
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteSuggestion(i)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4444', padding: '4px' }}
+                        >🗑️</button>
+                      </div>
+                    </div>
+                  ))}
+                  {currentSuggestions.length === 0 && (
+                    <div style={{ textAlign: 'center', color: colors.textSecondary, padding: '1rem', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                      Chưa có câu hỏi gợi ý nào cho môn học này.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ padding: '1.5rem 2rem', borderTop: `1px solid ${colors.border}`, textAlign: 'right' }}>
+            <button 
+              onClick={() => setIsSettingsOpen(false)}
+              style={{
+                padding: '12px 24px', borderRadius: '12px', border: `1px solid ${colors.border}`,
+                backgroundColor: colors.inputBg, color: colors.text, cursor: 'pointer', fontWeight: '700'
+              }}
+            >Đóng</button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const containerStyle: React.CSSProperties = {
     fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
@@ -624,9 +792,9 @@ function App() {
     <div style={containerStyle}>
       {isSettingsOpen && <SettingsModal />}
       <style>{`
-        @keyframes messageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes messageIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(217, 48, 37, 0); } 100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0); } }
-        .message-item { animation: messageIn 0.3s ease-out forwards; }
+        .message-item { animation: messageIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         .suggestion-pill:hover { filter: brightness(0.95); transform: translateY(-1px); }
         .suggestion-pill:active { transform: translateY(0); }
       `}</style>
@@ -701,15 +869,15 @@ function App() {
         {messages.map((msg, idx) => (
           <div key={idx} className="message-item" style={{
             maxWidth: "80%",
-            padding: "14px 20px",
-            borderRadius: "20px",
+            padding: "14px 22px",
+            borderRadius: "24px",
             lineHeight: "1.7",
             alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
             backgroundColor: msg.role === "user" ? colors.primary : colors.bubbleModel,
             color: msg.role === "user" ? "#fff" : colors.bubbleModelText,
-            borderBottomRightRadius: msg.role === "user" ? "4px" : "20px",
-            borderBottomLeftRadius: msg.role === "model" ? "4px" : "20px",
-            boxShadow: `0 4px 15px ${colors.shadow}`,
+            borderBottomRightRadius: msg.role === "user" ? "6px" : "24px",
+            borderBottomLeftRadius: msg.role === "model" ? "6px" : "24px",
+            boxShadow: msg.role === "user" ? `0 4px 12px ${colors.primary}33` : `0 4px 12px ${colors.shadow}`,
             whiteSpace: "pre-wrap",
             fontSize: "1rem",
             transition: "all 0.3s",
@@ -731,7 +899,7 @@ function App() {
           }}>
             <span style={{ fontSize: '0.8rem', fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginLeft: '4px' }}>💡 Gợi ý cho bạn:</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {SUBJECT_SUGGESTIONS[subject]?.map((suggestion, i) => (
+              {(suggestions[subject] || []).map((suggestion, i) => (
                 <button
                   key={i}
                   className="suggestion-pill"
