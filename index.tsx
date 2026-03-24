@@ -2,6 +2,31 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Chat } from "@google/genai";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import remarkBreaks from "remark-breaks";
+import "katex/dist/katex.min.css";
+import { motion, AnimatePresence } from "motion/react";
+import { 
+  Send, 
+  Mic, 
+  Settings, 
+  Moon, 
+  Sun, 
+  GraduationCap, 
+  ChevronLeft, 
+  RotateCcw, 
+  Plus, 
+  Trash2, 
+  Edit2, 
+  Check, 
+  X,
+  Sparkles,
+  BookOpen,
+  MessageSquare,
+  Info
+} from "lucide-react";
 import "./index.css";
 
 /**
@@ -64,6 +89,7 @@ Phong cách trả lời:
 - Ngắn gọn – đúng trọng tâm – sư phạm.
 - Giải thích khái niệm → Gợi ý bước thực hiện → Dẫn dắt người dùng tự giải quyết.
 - Sử dụng Markdown để trình bày (in đậm, danh sách, khối mã) nếu cần thiết.
+- **Lưu ý**: Sử dụng ký hiệu LaTeX (ví dụ: $x^2$, $\frac{a}{b}$) cho tất cả các công thức toán học, vật lý, hóa học để hiển thị đẹp hơn.
 
 Bạn KHÔNG phải là trợ lý đa năng. Bạn CHỈ là trợ lý cho môn: ${subject}.
 `;
@@ -116,23 +142,28 @@ const getThemeColors = (theme: Theme) => ({
 function LoadingIndicator({ theme }: { theme: Theme }) {
   const colors = getThemeColors(theme);
   return (
-    <div style={{ display: "flex", padding: "12px 0", gap: "4px" }}>
+    <div style={{ display: "flex", padding: "12px 0", gap: "6px", alignItems: "center" }}>
       {[0, 1, 2].map((i) => (
-        <div
+        <motion.div
           key={i}
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.4, 1, 0.4],
+          }}
+          transition={{
+            duration: 1,
+            repeat: Infinity,
+            delay: i * 0.2,
+            ease: "easeInOut",
+          }}
           style={{
-            width: "8px",
-            height: "8px",
+            width: "6px",
+            height: "6px",
             borderRadius: "50%",
             backgroundColor: colors.primary,
-            opacity: 0.6,
-            animation: `typingPulse 1s infinite ease-in-out ${i * 0.2}s`,
           }}
         />
       ))}
-      <style>
-        {`@keyframes typingPulse { 0%, 100% { transform: scale(0.8); opacity: 0.4; } 50% { transform: scale(1.2); opacity: 1; } }`}
-      </style>
     </div>
   );
 }
@@ -140,7 +171,9 @@ function LoadingIndicator({ theme }: { theme: Theme }) {
 function ThemeToggle({ theme, onToggle }: { theme: Theme, onToggle: () => void }) {
   const colors = getThemeColors(theme);
   return (
-    <button
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
       onClick={onToggle}
       style={{
         background: colors.inputBg,
@@ -156,24 +189,8 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme, onToggle: () => void }
       }}
       title={theme === 'light' ? "Chế độ tối" : "Chế độ sáng"}
     >
-      {theme === 'light' ? (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-      ) : (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-      )}
-    </button>
+      {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+    </motion.button>
   );
 }
 
@@ -209,7 +226,10 @@ function App() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (isSetup && subject) {
+      localStorage.setItem(`chat_history_${subject}`, JSON.stringify(messages));
+    }
+  }, [messages, isSetup, subject]);
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
@@ -241,12 +261,18 @@ function App() {
       });
 
       setIsSetup(true);
-      setMessages([
-        {
-          role: "model",
-          text: `Xin chào! Tôi là trợ lý chuyên môn cho môn **${subject}**. Bạn có thắc mắc gì về môn học này cần tôi giải đáp không? Hãy chọn một gợi ý bên dưới hoặc đặt câu hỏi trực tiếp cho tôi nhé!`,
-        },
-      ]);
+      
+      const savedHistory = localStorage.getItem(`chat_history_${subject}`);
+      if (savedHistory) {
+        setMessages(JSON.parse(savedHistory));
+      } else {
+        setMessages([
+          {
+            role: "model",
+            text: `Xin chào! Tôi là trợ lý chuyên môn cho môn **${subject}**. Bạn có thắc mắc gì về môn học này cần tôi giải đáp không? Hãy chọn một gợi ý bên dưới hoặc đặt câu hỏi trực tiếp cho tôi nhé!`,
+          },
+        ]);
+      }
     } catch (error) {
       console.error("Error initializing chat:", error);
       alert("Có lỗi khi khởi tạo. Vui lòng kiểm tra API Key.");
@@ -317,6 +343,18 @@ function App() {
       setSubject("");
       setMessages([]);
       chatRef.current = null;
+    }
+  };
+
+  const handleClearHistory = () => {
+    if (confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện của môn học này không?")) {
+      localStorage.removeItem(`chat_history_${subject}`);
+      setMessages([
+        {
+          role: "model",
+          text: `Lịch sử đã được xóa. Tôi là trợ lý chuyên môn cho môn **${subject}**. Bạn cần tôi giúp gì tiếp theo?`,
+        },
+      ]);
     }
   };
 
@@ -402,17 +440,31 @@ function App() {
   };
 
   const WelcomeScreen = () => (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 2000, padding: '1rem'
-    }}>
-      <div style={{
-        backgroundColor: colors.surface, padding: '3rem 2rem', borderRadius: '32px',
-        width: '100%', maxWidth: '500px', boxShadow: `0 30px 60px ${colors.shadow}`,
-        textAlign: 'center'
-      }}>
-        <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>👋</div>
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: colors.background, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 2000, padding: '1rem'
+      }}
+    >
+      <motion.div 
+        initial={{ y: 20, scale: 0.95 }}
+        animate={{ y: 0, scale: 1 }}
+        style={{
+          backgroundColor: colors.surface, padding: '3rem 2rem', borderRadius: '32px',
+          width: '100%', maxWidth: '500px', boxShadow: `0 30px 60px ${colors.shadow}`,
+          textAlign: 'center', border: `1px solid ${colors.border}`
+        }}
+      >
+        <motion.div 
+          animate={{ rotate: [0, 10, -10, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          style={{ fontSize: '4rem', marginBottom: '1.5rem' }}
+        >
+          <Sparkles size={64} color={colors.primary} style={{ margin: '0 auto' }} />
+        </motion.div>
         <h1 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '1rem' }}>Chào mừng bạn!</h1>
         <p style={{ color: colors.textSecondary, lineHeight: '1.6', marginBottom: '2rem' }}>
           Để bắt đầu sử dụng Trợ lý Học tập AI, bạn cần cấu hình Gemini API Key. 
@@ -423,11 +475,13 @@ function App() {
           textAlign: 'left', backgroundColor: colors.inputBg, padding: '1.5rem', 
           borderRadius: '20px', marginBottom: '2rem', border: `1px solid ${colors.border}` 
         }}>
-          <h3 style={{ marginTop: 0, fontSize: '1rem', marginBottom: '1rem' }}>Hướng dẫn lấy API Key:</h3>
+          <h3 style={{ marginTop: 0, fontSize: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Info size={18} color={colors.primary} /> Hướng dẫn lấy API Key:
+          </h3>
           <ol style={{ paddingLeft: '1.2rem', fontSize: '0.9rem', color: colors.text, lineHeight: '1.8' }}>
             <li>Truy cập <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: colors.primary, fontWeight: '700', textDecoration: 'none' }}>Google AI Studio</a>.</li>
             <li>Nhấn nút <b>"Create API key"</b>.</li>
-            <li>Sao chép mã (chuỗi ký tự dài) và dán vào ô bên dưới.</li>
+            <li>Sao chép mã và dán vào ô bên dưới.</li>
           </ol>
         </div>
 
@@ -439,11 +493,14 @@ function App() {
           style={{
             width: '100%', padding: '16px 20px', borderRadius: '16px',
             border: `2px solid ${colors.border}`, backgroundColor: colors.inputBg,
-            color: colors.text, marginBottom: '1.5rem', outline: 'none', fontSize: '1rem'
+            color: colors.text, marginBottom: '1.5rem', outline: 'none', fontSize: '1rem',
+            transition: 'border-color 0.2s'
           }}
         />
 
-        <button 
+        <motion.button 
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => saveApiKey(apiKey)}
           disabled={!apiKey.trim()}
           style={{
@@ -451,11 +508,10 @@ function App() {
             backgroundColor: colors.primary, color: 'white', cursor: apiKey.trim() ? 'pointer' : 'not-allowed', 
             fontWeight: '700', fontSize: '1.1rem', opacity: apiKey.trim() ? 1 : 0.6,
             boxShadow: apiKey.trim() ? `0 10px 20px ${colors.primary}44` : 'none',
-            transition: 'all 0.3s'
           }}
         >
           Bắt đầu sử dụng
-        </button>
+        </motion.button>
         
         {process.env.API_KEY && (
           <button 
@@ -465,11 +521,11 @@ function App() {
               cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'underline'
             }}
           >
-            Sử dụng Key hệ thống (nếu có)
+            Sử dụng Key hệ thống
           </button>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 
   const SettingsModal = () => {
@@ -518,41 +574,58 @@ function App() {
     };
 
     return (
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 3000, backdropFilter: 'blur(8px)', padding: '1rem'
-      }}>
-        <div style={{
-          backgroundColor: colors.surface, borderRadius: '28px',
-          width: '100%', maxWidth: '500px', maxHeight: '90vh', overflow: 'hidden',
-          boxShadow: `0 25px 50px ${colors.shadow}`, display: 'flex', flexDirection: 'column'
-        }}>
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 3000, backdropFilter: 'blur(12px)', padding: '1rem'
+        }}
+      >
+        <motion.div 
+          initial={{ scale: 0.9, y: 20 }}
+          animate={{ scale: 1, y: 0 }}
+          style={{
+            backgroundColor: colors.surface, borderRadius: '28px',
+            width: '100%', maxWidth: '500px', maxHeight: '85vh', overflow: 'hidden',
+            boxShadow: `0 25px 50px ${colors.shadow}`, display: 'flex', flexDirection: 'column',
+            border: `1px solid ${colors.border}`
+          }}
+        >
           {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: `1px solid ${colors.border}` }}>
+          <div style={{ display: 'flex', borderBottom: `1px solid ${colors.border}`, backgroundColor: colors.inputBg + '44' }}>
             <button 
               onClick={() => setActiveTab('api')}
               style={{
                 flex: 1, padding: '1.2rem', border: 'none', background: 'none',
                 color: activeTab === 'api' ? colors.primary : colors.textSecondary,
-                fontWeight: '700', cursor: 'pointer', borderBottom: activeTab === 'api' ? `3px solid ${colors.primary}` : 'none'
+                fontWeight: '800', cursor: 'pointer', borderBottom: activeTab === 'api' ? `3px solid ${colors.primary}` : 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em'
               }}
-            >API Key</button>
+            >
+              <Settings size={18} /> API Key
+            </button>
             <button 
               onClick={() => setActiveTab('suggestions')}
               style={{
                 flex: 1, padding: '1.2rem', border: 'none', background: 'none',
                 color: activeTab === 'suggestions' ? colors.primary : colors.textSecondary,
-                fontWeight: '700', cursor: 'pointer', borderBottom: activeTab === 'suggestions' ? `3px solid ${colors.primary}` : 'none'
+                fontWeight: '800', cursor: 'pointer', borderBottom: activeTab === 'suggestions' ? `3px solid ${colors.primary}` : 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em'
               }}
-            >Gợi ý câu hỏi</button>
+            >
+              <MessageSquare size={18} /> Gợi ý
+            </button>
           </div>
 
           <div style={{ padding: '2rem', overflowY: 'auto', flex: 1 }}>
             {activeTab === 'api' ? (
-              <>
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem' }}>Cấu hình API Key</h2>
-                <p style={{ color: colors.textSecondary, fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem', fontWeight: '800' }}>Cấu hình API Key</h2>
+                <p style={{ color: colors.textSecondary, fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
                   Nhập Gemini API Key của bạn để sử dụng ứng dụng. Key sẽ được lưu an toàn trong trình duyệt của bạn.
                 </p>
                 <input 
@@ -563,22 +636,26 @@ function App() {
                   style={{
                     width: '100%', padding: '14px 18px', borderRadius: '14px',
                     border: `2px solid ${colors.border}`, backgroundColor: colors.inputBg,
-                    color: colors.text, marginBottom: '1.5rem', outline: 'none'
+                    color: colors.text, marginBottom: '1.5rem', outline: 'none',
+                    transition: 'border-color 0.2s'
                   }}
                 />
-                <button 
+                <motion.button 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => saveApiKey(apiKey)}
                   style={{
                     width: '100%', padding: '14px', borderRadius: '14px', border: 'none',
-                    backgroundColor: colors.primary, color: 'white', cursor: 'pointer', fontWeight: '700'
+                    backgroundColor: colors.primary, color: 'white', cursor: 'pointer', fontWeight: '700',
+                    boxShadow: `0 4px 12px ${colors.primary}33`
                   }}
-                >Lưu API Key</button>
-              </>
+                >Lưu API Key</motion.button>
+              </motion.div>
             ) : (
-              <>
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem' }}>Quản lý câu hỏi gợi ý</h2>
+              <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}>
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem', fontWeight: '800' }}>Quản lý câu hỏi gợi ý</h2>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600', color: colors.textSecondary }}>Chọn môn học:</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' }}>Chọn môn học:</label>
                   <select 
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value)}
@@ -593,7 +670,7 @@ function App() {
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600', color: colors.textSecondary }}>Thêm gợi ý mới:</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' }}>Thêm gợi ý mới:</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input 
                       type="text"
@@ -607,70 +684,88 @@ function App() {
                         color: colors.text, outline: 'none'
                       }}
                     />
-                    <button 
+                    <motion.button 
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={handleAddSuggestion}
                       style={{
-                        padding: '0 16px', borderRadius: '12px', border: 'none',
-                        backgroundColor: colors.primary, color: 'white', cursor: 'pointer', fontWeight: '700'
+                        width: '44px', height: '44px', borderRadius: '12px', border: 'none',
+                        backgroundColor: colors.primary, color: 'white', cursor: 'pointer', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}
-                    >+</button>
+                    ><Plus size={20} /></motion.button>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {currentSuggestions.map((s, i) => (
-                    <div key={i} style={{
-                      padding: '12px', borderRadius: '12px', backgroundColor: colors.inputBg,
-                      border: `1px solid ${colors.border}`, display: 'flex', gap: '10px', alignItems: 'center'
-                    }}>
-                      {editingIdx === i ? (
-                        <input 
-                          autoFocus
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          onBlur={() => handleSaveEdit(i)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(i)}
-                          style={{ flex: 1, background: 'none', border: 'none', color: colors.text, outline: 'none' }}
-                        />
-                      ) : (
-                        <span style={{ flex: 1, fontSize: '0.9rem' }}>{s}</span>
-                      )}
-                      
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button 
-                          onClick={() => editingIdx === i ? handleSaveEdit(i) : handleStartEdit(i, s)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.primary, padding: '4px' }}
-                        >
-                          {editingIdx === i ? "✅" : "✏️"}
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteSuggestion(i)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ff4444', padding: '4px' }}
-                        >🗑️</button>
-                      </div>
-                    </div>
-                  ))}
+                  <AnimatePresence>
+                    {currentSuggestions.map((s, i) => (
+                      <motion.div 
+                        key={i} 
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        style={{
+                          padding: '12px 16px', borderRadius: '14px', backgroundColor: colors.inputBg,
+                          border: `1px solid ${colors.border}`, display: 'flex', gap: '10px', alignItems: 'center'
+                        }}
+                      >
+                        {editingIdx === i ? (
+                          <input 
+                            autoFocus
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            onBlur={() => handleSaveEdit(i)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(i)}
+                            style={{ flex: 1, background: 'none', border: 'none', color: colors.text, outline: 'none', fontSize: '0.9rem' }}
+                          />
+                        ) : (
+                          <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: '500' }}>{s}</span>
+                        )}
+                        
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <motion.button 
+                            whileHover={{ scale: 1.1, color: colors.primary }}
+                            onClick={() => editingIdx === i ? handleSaveEdit(i) : handleStartEdit(i, s)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary, padding: '6px' }}
+                          >
+                            {editingIdx === i ? <Check size={16} /> : <Edit2 size={16} />}
+                          </motion.button>
+                          <motion.button 
+                            whileHover={{ scale: 1.1, color: '#ef4444' }}
+                            onClick={() => handleDeleteSuggestion(i)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary, padding: '6px' }}
+                          >
+                            <Trash2 size={16} />
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                   {currentSuggestions.length === 0 && (
-                    <div style={{ textAlign: 'center', color: colors.textSecondary, padding: '1rem', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                    <div style={{ textAlign: 'center', color: colors.textSecondary, padding: '1.5rem', fontSize: '0.9rem', fontStyle: 'italic' }}>
                       Chưa có câu hỏi gợi ý nào cho môn học này.
                     </div>
                   )}
                 </div>
-              </>
+              </motion.div>
             )}
           </div>
 
-          <div style={{ padding: '1.5rem 2rem', borderTop: `1px solid ${colors.border}`, textAlign: 'right' }}>
-            <button 
+          <div style={{ padding: '1.2rem 2rem', borderTop: `1px solid ${colors.border}`, textAlign: 'right', backgroundColor: colors.inputBg + '22' }}>
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setIsSettingsOpen(false)}
               style={{
-                padding: '12px 24px', borderRadius: '12px', border: `1px solid ${colors.border}`,
-                backgroundColor: colors.inputBg, color: colors.text, cursor: 'pointer', fontWeight: '700'
+                padding: '10px 24px', borderRadius: '12px', border: `1px solid ${colors.border}`,
+                backgroundColor: colors.surface, color: colors.text, cursor: 'pointer', fontWeight: '700',
+                fontSize: '0.9rem'
               }}
-            >Đóng</button>
+            >Đóng</motion.button>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     );
   };
 
@@ -689,42 +784,53 @@ function App() {
       <div style={containerStyle}>
         {showWelcome && <WelcomeScreen />}
         {isSettingsOpen && <SettingsModal />}
-        <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', gap: '12px' }}>
-          <button
+        <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', gap: '12px', zIndex: 10 }}>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => setIsSettingsOpen(true)}
             style={{
-              background: colors.inputBg, border: "none", cursor: "pointer",
+              background: colors.inputBg, cursor: "pointer",
               padding: "10px", borderRadius: "12px", display: "flex",
               alignItems: "center", justifyContent: "center", color: colors.textSecondary,
+              border: `1px solid ${colors.border}`
             }}
             title="Cấu hình API Key"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-          </button>
+            <Settings size={20} />
+          </motion.button>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </div>
         <div style={{ display: 'flex', flex: 1, justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
-          <div style={{
-            padding: "3rem 2.5rem",
-            backgroundColor: colors.surface,
-            borderRadius: "24px",
-            boxShadow: `0 20px 50px ${colors.shadow}`,
-            maxWidth: "450px",
-            width: "100%",
-            textAlign: "center",
-            transition: "all 0.3s ease",
-          }}>
-            <div style={{ 
-              width: '100px', height: '100px', 
-              backgroundColor: colors.inputBg, 
-              borderRadius: '50%', margin: '0 auto 1.5rem',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '3.5rem'
-            }}>🎓</div>
-            <h1 style={{ marginBottom: "0.5rem", color: colors.text, fontSize: "2rem", fontWeight: "800" }}>Trợ lý Học tập</h1>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              padding: "3rem 2.5rem",
+              backgroundColor: colors.surface,
+              borderRadius: "32px",
+              boxShadow: `0 20px 50px ${colors.shadow}`,
+              maxWidth: "450px",
+              width: "100%",
+              textAlign: "center",
+              border: `1px solid ${colors.border}`
+            }}
+          >
+            <motion.div 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              style={{ 
+                width: '100px', height: '100px', 
+                backgroundColor: colors.primary + '11', 
+                borderRadius: '30px', margin: '0 auto 1.5rem',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: colors.primary
+              }}
+            >
+              <GraduationCap size={56} />
+            </motion.div>
+            <h1 style={{ marginBottom: "0.5rem", color: colors.text, fontSize: "2rem", fontWeight: "800", letterSpacing: '-0.03em' }}>Trợ lý Học tập</h1>
             <p style={{ marginBottom: '2.5rem', color: colors.textSecondary, lineHeight: '1.6', fontSize: '0.95rem' }}>
               Chọn môn học để bắt đầu hành trình chinh phục kiến thức cùng trí tuệ nhân tạo.
             </p>
@@ -732,7 +838,8 @@ function App() {
             <div style={{ position: 'relative', textAlign: 'left' }}>
               <label style={{ 
                 display: 'block', marginBottom: '0.6rem', fontSize: '0.85rem', 
-                fontWeight: '600', color: colors.textSecondary, marginLeft: '4px' 
+                fontWeight: '700', color: colors.textSecondary, marginLeft: '4px',
+                textTransform: 'uppercase', letterSpacing: '0.05em'
               }}>Lĩnh vực học tập</label>
               <select
                 style={{
@@ -751,7 +858,7 @@ function App() {
                   backgroundRepeat: "no-repeat",
                   backgroundPosition: "right 20px center",
                   backgroundSize: "20px",
-                  transition: "border-color 0.2s",
+                  transition: "all 0.2s",
                 }}
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
@@ -764,28 +871,28 @@ function App() {
               </select>
             </div>
 
-            <button 
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               style={{
                 width: "100%",
-                padding: "16px",
+                padding: "18px",
                 backgroundColor: colors.primary,
                 color: "white",
                 border: "none",
-                borderRadius: "16px",
+                borderRadius: "18px",
                 fontSize: "1.1rem",
                 cursor: subject ? "pointer" : "not-allowed",
                 fontWeight: "700",
                 opacity: subject ? 1 : 0.6,
-                transform: subject ? 'translateY(0)' : 'translateY(0)',
-                boxShadow: subject ? `0 8px 15px ${colors.primary}44` : "none",
-                transition: "all 0.3s cubic-bezier(0.2, 0, 0, 1)",
+                boxShadow: subject ? `0 8px 25px ${colors.primary}44` : "none",
               }} 
               onClick={handleStart}
               disabled={!subject}
             >
               Bắt đầu ngay
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         </div>
       </div>
     );
@@ -803,160 +910,232 @@ function App() {
       `}</style>
       
       {/* Header */}
-      <div style={{
-        padding: "1rem 2rem",
-        backgroundColor: colors.surface,
-        borderBottom: `1px solid ${colors.border}`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        boxShadow: `0 4px 12px ${colors.shadow}`,
-        zIndex: 100,
-        transition: "all 0.3s",
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ 
-            width: '44px', height: '44px', 
-            borderRadius: '12px', 
-            backgroundColor: colors.primary + '11',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1.5rem'
-          }}>📚</div>
+      <motion.div 
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        style={{
+          padding: "0.75rem 1.5rem",
+          backgroundColor: colors.surface + 'dd',
+          backdropFilter: 'blur(12px)',
+          borderBottom: `1px solid ${colors.border}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          boxShadow: `0 4px 20px ${colors.shadow}`,
+          zIndex: 100,
+          transition: "all 0.3s",
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <motion.div 
+            whileHover={{ rotate: 15 }}
+            style={{ 
+              width: '40px', height: '40px', 
+              borderRadius: '12px', 
+              backgroundColor: colors.primary + '11',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: colors.primary
+            }}
+          >
+            <BookOpen size={22} />
+          </motion.div>
           <div>
-            <div style={{ fontSize: "1.25rem", fontWeight: "800", color: colors.primary, letterSpacing: '-0.02em' }}>{subject}</div>
-            <div style={{ fontSize: '0.75rem', color: colors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Chuyên gia Giáo dục</div>
+            <div style={{ fontSize: "1.1rem", fontWeight: "800", color: colors.text, letterSpacing: '-0.02em' }}>{subject}</div>
+            <div style={{ fontSize: '0.7rem', color: colors.textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Sparkles size={10} /> AI Chuyên gia
+            </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => setIsSettingsOpen(true)}
             style={{
-              background: colors.inputBg, border: "none", cursor: "pointer",
-              padding: "10px", borderRadius: "12px", display: "flex",
+              background: colors.inputBg, cursor: "pointer",
+              padding: "8px", borderRadius: "10px", display: "flex",
               alignItems: "center", justifyContent: "center", color: colors.textSecondary,
+              border: `1px solid ${colors.border}`
             }}
             title="Cấu hình API Key"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-          </button>
+            <Settings size={18} />
+          </motion.button>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          <div style={{ width: '1px', height: '24px', backgroundColor: colors.border, margin: '0 4px' }} />
-          <button style={{
-            background: 'transparent',
-            border: `1.5px solid ${colors.border}`,
-            padding: "10px 18px",
-            borderRadius: "12px",
-            cursor: "pointer",
-            fontSize: "0.85rem",
-            color: colors.textSecondary,
-            fontWeight: "700",
-            transition: "all 0.2s",
-          }} onClick={handleReset}>
-            Đổi môn học
-          </button>
+          <div style={{ width: '1px', height: '20px', backgroundColor: colors.border, margin: '0 2px' }} />
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleClearHistory}
+            style={{
+              background: colors.inputBg, cursor: "pointer",
+              padding: "8px", borderRadius: "10px", display: "flex",
+              alignItems: "center", justifyContent: "center", color: "#ef4444",
+              border: `1px solid ${colors.border}`
+            }}
+            title="Xóa lịch sử chat"
+          >
+            <Trash2 size={18} />
+          </motion.button>
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            style={{
+              background: colors.inputBg,
+              border: `1px solid ${colors.border}`,
+              padding: "8px 14px",
+              borderRadius: "10px",
+              cursor: "pointer",
+              fontSize: "0.8rem",
+              color: colors.textSecondary,
+              fontWeight: "700",
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }} 
+            onClick={handleReset}
+          >
+            <RotateCcw size={14} /> Đổi môn
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Chat Area */}
       <div style={{
         flex: 1,
         overflowY: "auto",
-        padding: "2rem",
+        padding: "1.5rem",
         display: "flex",
         flexDirection: "column",
-        gap: "1.5rem",
+        gap: "1.2rem",
+        scrollBehavior: 'smooth'
       }}>
-        {messages.map((msg, idx) => (
-          <div key={idx} className="message-item" style={{
-            maxWidth: "80%",
-            padding: "14px 22px",
-            borderRadius: "24px",
-            lineHeight: "1.7",
-            alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-            backgroundColor: msg.role === "user" ? colors.primary : colors.bubbleModel,
-            color: msg.role === "user" ? "#fff" : colors.bubbleModelText,
-            borderBottomRightRadius: msg.role === "user" ? "6px" : "24px",
-            borderBottomLeftRadius: msg.role === "model" ? "6px" : "24px",
-            boxShadow: msg.role === "user" ? `0 4px 12px ${colors.primary}33` : `0 4px 12px ${colors.shadow}`,
-            whiteSpace: "pre-wrap",
-            fontSize: "1rem",
-            transition: "all 0.3s",
-            border: msg.role === "model" ? `1px solid ${colors.border}` : "none",
-          }}>
-            {msg.text || (msg.role === "model" && isGenerating && idx === messages.length - 1 ? <LoadingIndicator theme={theme} /> : "")}
-          </div>
-        ))}
+        <AnimatePresence initial={false}>
+          {messages.map((msg, idx) => (
+            <motion.div 
+              key={idx} 
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              style={{
+                maxWidth: "85%",
+                padding: "12px 18px",
+                borderRadius: "20px",
+                lineHeight: "1.6",
+                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                backgroundColor: msg.role === "user" ? colors.primary : colors.bubbleModel,
+                color: msg.role === "user" ? "#fff" : colors.bubbleModelText,
+                borderBottomRightRadius: msg.role === "user" ? "4px" : "20px",
+                borderBottomLeftRadius: msg.role === "model" ? "4px" : "20px",
+                boxShadow: msg.role === "user" 
+                  ? `0 4px 12px ${colors.primary}22` 
+                  : `0 2px 10px ${colors.shadow}`,
+                fontSize: "0.95rem",
+                border: msg.role === "model" ? `1px solid ${colors.border}` : "none",
+                position: 'relative'
+              }}
+            >
+              {msg.text ? (
+                <div className="markdown-body">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkMath, remarkBreaks]} 
+                    rehypePlugins={[rehypeKatex]}
+                  >
+                    {msg.text}
+                  </ReactMarkdown>
+                </div>
+              ) : (msg.role === "model" && isGenerating && idx === messages.length - 1 ? <LoadingIndicator theme={theme} /> : "")}
+              
+              {msg.role === "model" && !isGenerating && idx === messages.length - 1 && (
+                <div style={{ position: 'absolute', bottom: '-20px', left: '4px', fontSize: '0.65rem', color: colors.textSecondary, fontWeight: '600' }}>
+                  Trợ lý AI • Vừa xong
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
 
         {/* Suggested Questions Section */}
         {messages.length === 1 && !isGenerating && (
-          <div style={{
-            marginTop: '1rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.8rem',
-            alignItems: 'flex-start',
-            animation: 'messageIn 0.5s ease-out 0.2s both'
-          }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginLeft: '4px' }}>💡 Gợi ý cho bạn:</span>
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            style={{
+              marginTop: '0.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.8rem',
+              alignItems: 'flex-start',
+            }}
+          >
+            <span style={{ fontSize: '0.75rem', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginLeft: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={12} color={colors.primary} /> Gợi ý cho bạn:
+            </span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {(suggestions[subject] || []).map((suggestion, i) => (
-                <button
+                <motion.button
                   key={i}
-                  className="suggestion-pill"
+                  whileHover={{ scale: 1.02, backgroundColor: colors.primary + '11' }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => sendMessage(suggestion)}
                   style={{
                     backgroundColor: colors.suggestionBg,
                     color: colors.suggestionText,
-                    border: 'none',
-                    padding: '10px 18px',
-                    borderRadius: '14px',
-                    fontSize: '0.9rem',
+                    border: `1px solid ${colors.primary}22`,
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
                     fontWeight: '600',
                     cursor: 'pointer',
-                    transition: 'all 0.2s',
                     textAlign: 'left',
                     maxWidth: '100%'
                   }}
                 >
                   {suggestion}
-                </button>
+                </motion.button>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
-      <div style={{
-        padding: "1.5rem 2rem",
-        backgroundColor: colors.surface,
-        borderTop: `1px solid ${colors.border}`,
-        transition: "all 0.3s",
-        boxShadow: `0 -10px 30px ${colors.shadow}`,
-      }}>
+      <motion.div 
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        style={{
+          padding: "1.2rem 1.5rem",
+          backgroundColor: colors.surface + 'dd',
+          backdropFilter: 'blur(12px)',
+          borderTop: `1px solid ${colors.border}`,
+          boxShadow: `0 -10px 30px ${colors.shadow}`,
+        }}
+      >
         <div style={{
-          maxWidth: '900px',
+          maxWidth: '800px',
           margin: '0 auto',
           display: "flex",
-          gap: "1rem",
+          gap: "0.75rem",
           alignItems: "flex-end",
           backgroundColor: colors.inputBg,
           padding: '8px 12px',
-          borderRadius: '24px',
-          border: `2px solid ${isGenerating ? 'transparent' : colors.border}`,
-          transition: 'border-color 0.2s',
+          borderRadius: '28px',
+          border: `1px solid ${isGenerating ? colors.primary + '66' : colors.border}`,
+          transition: 'all 0.3s ease',
+          boxShadow: isGenerating 
+            ? `0 0 20px ${colors.primary}15` 
+            : `0 4px 20px ${colors.shadow}`,
         }}>
-          <button
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             style={{
-              width: "44px", height: "44px", borderRadius: "50%",
-              backgroundColor: isRecording ? "#fce8e6" : "transparent",
-              color: isRecording ? "#d93025" : colors.textSecondary,
+              width: "40px", height: "40px", borderRadius: "50%",
+              backgroundColor: isRecording ? "#fee2e2" : "transparent",
+              color: isRecording ? "#ef4444" : colors.textSecondary,
               border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0,
-              animation: isRecording ? "pulse 1.5s infinite" : "none",
               transition: "all 0.2s",
             }}
             onClick={handleMicClick}
@@ -964,22 +1143,17 @@ function App() {
             title="Ghi âm câu hỏi"
           >
              {isTranscribing ? <LoadingIndicator theme={theme} /> : (
-               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                 <line x1="12" y1="19" x2="12" y2="23"></line>
-                 <line x1="8" y1="23" x2="16" y2="23"></line>
-               </svg>
+               isRecording ? <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }}><Mic size={20} /></motion.div> : <Mic size={20} />
              )}
-          </button>
+          </motion.button>
 
           <textarea
             style={{
               flex: 1, 
-              padding: "10px 8px", 
+              padding: "10px 4px", 
               borderRadius: "0", 
               border: `none`,
-              fontSize: "1rem", 
+              fontSize: "0.95rem", 
               outline: "none", 
               resize: "none", 
               height: "24px", 
@@ -990,7 +1164,7 @@ function App() {
               color: colors.text,
               lineHeight: '1.5'
             }}
-            placeholder={isRecording ? "Đang lắng nghe..." : (isTranscribing ? "Đang chép lời..." : "Đặt câu hỏi chuyên môn cho tôi...")}
+            placeholder={isRecording ? "Đang lắng nghe..." : (isTranscribing ? "Đang chép lời..." : "Đặt câu hỏi cho tôi...")}
             value={inputText}
             onChange={handleInputResize}
             onKeyDown={handleKeyDown}
@@ -998,30 +1172,28 @@ function App() {
             rows={1}
           />
           
-          <button 
+          <motion.button 
+            whileHover={inputText.trim() && !isGenerating ? { scale: 1.05 } : {}}
+            whileTap={inputText.trim() && !isGenerating ? { scale: 0.95 } : {}}
             style={{
-              width: "44px", height: "44px", borderRadius: "18px",
+              width: "40px", height: "40px", borderRadius: "14px",
               backgroundColor: colors.primary, color: "white",
               border: "none", display: "flex", alignItems: "center", justifyContent: "center",
               cursor: inputText.trim() && !isGenerating ? "pointer" : "default",
               opacity: inputText.trim() && !isGenerating && !isRecording && !isTranscribing ? 1 : 0.4,
-              boxShadow: inputText.trim() && !isGenerating ? `0 4px 12px ${colors.primary}66` : "none",
-              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-              transform: inputText.trim() && !isGenerating ? 'scale(1)' : 'scale(0.9)',
+              boxShadow: inputText.trim() && !isGenerating ? `0 4px 12px ${colors.primary}44` : "none",
+              transition: "all 0.2s",
             }} 
             onClick={handleSendMessage}
             disabled={!inputText.trim() || isGenerating || isRecording || isTranscribing}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
+            <Send size={18} />
+          </motion.button>
         </div>
-        <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '0.7rem', color: colors.textSecondary, fontWeight: '500' }}>
-          AI có thể mắc sai sót. Hãy kiểm tra các thông tin quan trọng.
+        <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '0.7rem', color: colors.textSecondary, fontWeight: '700', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+          Bản quyền thuộc về NTT_IT_GROUP
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
